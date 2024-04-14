@@ -35,7 +35,7 @@ enum RValueType {
 #define _RVALUE_IS_TYPE(rval, type) ((rval).type == RVT_##type)
 #define RVALUE_IS_NONE(rval) ((rval).type == RVT_NONE)
 #define RVALUE_IS_BOOL(rval) ((rval).type == RVT_BOOL)
-#define RVALUE_IS_INT(rval) (((rval).type >= RVT_INT8) || ((rval).type <= RVT_INT64))
+#define RVALUE_IS_INT(rval) (((rval).type >= RVT_INT8) && ((rval).type <= RVT_INT64))
 #define RVALUE_IS_INT8(rval) _RVALUE_IS_TYPE(rval, INT8)
 #define RVALUE_IS_INT16(rval) _RVALUE_IS_TYPE(rval, INT16)
 #define RVALUE_IS_INT32(rval) _RVALUE_IS_TYPE(rval, INT32)
