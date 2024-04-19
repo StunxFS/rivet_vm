@@ -5,7 +5,7 @@
 #ifndef RIVET_RV_H
 #define RIVET_RV_H
 
-#include "./common.h"
+#include "../common/common.h"
 
 TYPEDEF(struct, RValue);
 TYPEDEF(enum, RValueType);

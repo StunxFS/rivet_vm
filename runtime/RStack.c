@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "./common.h"
+#include "../common/common.h"
 #include "./RStack.h"
 
 RStack RStack_new(usize len) {

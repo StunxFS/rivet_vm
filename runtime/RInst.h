@@ -5,7 +5,7 @@
 #ifndef RIVET_RINST_H
 #define RIVET_RINST_H
 
-#include "./common.h"
+#include "../common/common.h"
 
 TYPEDEF(enum, ROpcode);
 TYPEDEF(struct, RInst);

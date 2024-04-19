@@ -5,7 +5,7 @@
 #ifndef RIVET_RMOD_H
 #define RIVET_RMOD_H
 
-#include "./common.h"
+#include "../common/common.h"
 #include "./RFunc.h"
 #include "./RValue.h"
 

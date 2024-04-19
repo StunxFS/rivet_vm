@@ -5,7 +5,7 @@
 #ifndef RIVET_VM_H
 #define RIVET_VM_H
 
-#include "./common.h"
+#include "../common/common.h"
 #include "./RModule.h"
 
 TYPEDEF(struct, RVM);

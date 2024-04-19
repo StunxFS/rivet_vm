@@ -1,0 +1,14 @@
+.module "Module"
+.version "0.1.0a"
+.entry "main"
+
+.constant_pool {
+    .int32 2004
+    .int32 10
+}
+
+.func "main" {
+    .registers 5
+    add R(0), C(0), C(1)
+}
+

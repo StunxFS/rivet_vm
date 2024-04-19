@@ -5,7 +5,7 @@
 #ifndef RIVET_RFUNC_H
 #define RIVET_RFUNC_H
 
-#include "./common.h"
+#include "../common/common.h"
 #include "./RInst.h"
 #include "./RStack.h"
 

@@ -9,7 +9,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-#include "./common.h"
+#include "../common/common.h"
 
 void println(const cstr msg, ...) {
     char* m = NULL;
