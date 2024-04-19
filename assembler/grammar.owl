@@ -1,0 +1,39 @@
+#using owl.v4
+
+# Copyright (C) 2024-present Jose Mendoza - All rights reserved. Use of this
+# source code is governed by an MIT license that can be found in the LICENSE
+# file.
+
+module = decls*
+
+decls =
+    '.module' string : module_name
+    '.version' string : rvm_version
+    '.entry' string : entry_point
+    '.constant_pool' '{' constant_pool-decl* '}' : constant_pool
+    '.func' string '{' registers (label | inst)* '}' : func
+
+constant_pool-decl =
+    '.none' : knone
+    '.bool' ('true' | 'false') : kbool
+    '.int8' integer : kint8
+    '.int16' integer : kint16
+    '.int32' integer : kint32
+    '.int64' integer : kint64
+    '.str' string : kstr
+
+registers = '.registers' integer
+
+label = identifier ':'
+
+inst =
+    'mov' reg ',' reg_or_konst : inst_mov
+    'call' konst ',' konst ',' reg : inst_call
+    'ret' (reg?) : inst_ret
+
+reg_or_konst = reg | konst
+reg = [ 'R' '(' integer ')' ]
+konst = [ 'C' '(' integer ')' ]
+
+.line-comment-token '//'
+

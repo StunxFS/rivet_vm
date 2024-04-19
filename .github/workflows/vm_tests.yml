@@ -17,7 +17,7 @@ jobs:
 
       - name: Compiling VM with Clang
         run: |
-          gcc runtime/** common/** -o bin/rvm
+          make build-rvm
           ./bin/rvm
 
   ubuntu-gcc:
@@ -25,7 +25,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Compiling VM with GCC
-        run: |
-          gcc runtime/** common/** -o bin/rvm
-          ./bin/rvm
+      #- name: Compiling VM with GCC
+      #  run: |
+          #make build-rvm CC=clang
+          #./bin/rvm

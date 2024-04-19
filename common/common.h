@@ -20,6 +20,7 @@ typedef void* rawptr;
 typedef char* cstr;
 
 void println(const cstr msg, ...);
+void panic(const cstr msg, ...);
 void runtimeError(const cstr msg, ...);
 
 #endif

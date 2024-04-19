@@ -7,8 +7,19 @@
     .int32 10
 }
 
+.func "other_func" {
+    .registers 0
+    ret
+}
+
 .func "main" {
     .registers 5
-    add R(0), C(0), C(1)
+
+entry:
+    mov R(0), C(0)
+    call C(0), C(0), R(1)
+
+exit:
+    ret R(1)
 }
 
