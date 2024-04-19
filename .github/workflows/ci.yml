@@ -1,0 +1,26 @@
+name: VM Tests
+
+on:
+  push:
+    branches:
+      - 'main'
+    paths: ['runtime/**', 'assembler/**']
+  pull_request:
+    paths: ['runtime/**', 'assembler/**']
+    types: [opened, synchronize]
+
+jobs:
+  ubuntu-gcc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compiling VM with GCC
+        run: |
+          make build-rvm
+          ./bin/rvm
+
+      - name: Compiling assembler with GCC
+        run: |
+          make build-asm
+
