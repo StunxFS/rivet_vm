@@ -1,0 +1,31 @@
+name: VM Tests
+
+on:
+  push:
+    branches:
+      - 'main'
+    paths: ['runtime/**']
+  pull_request:
+    paths: ['runtime/**']
+    types: [opened, synchronize]
+
+jobs:
+  ubuntu-clang:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compiling VM with Clang
+        run: |
+          gcc runtime/** common/** -o bin/rvm
+          ./bin/rvm
+
+  ubuntu-gcc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compiling VM with GCC
+        run: |
+          gcc runtime/** common/** -o bin/rvm
+          ./bin/rvm
