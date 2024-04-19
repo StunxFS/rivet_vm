@@ -15,11 +15,15 @@ TYPEDEF(struct, RStack);
 struct RStack {
     RValue* block;
     RValue* top;
-    size_t len;
-    size_t cap;
+    RValue* end;
+    usize len;
 };
 
-RStack RStack_new(size_t len);
+RStack RStack_new(usize len);
+RStack RStack_from_array(RValue* arr, usize len);
+RValue RStack_get(RStack* self, usize idx);
+RValue* RStack_get_ref(RStack* self, usize idx);
+void RStack_set(RStack* self, usize idx, RValue value);
 void RStack_push(RStack* self, RValue value);
 RValue RStack_pop(RStack* self);
 void RStack_print(RStack* self);

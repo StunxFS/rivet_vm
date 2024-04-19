@@ -5,11 +5,21 @@
 #ifndef RIVET_COMMON_H
 #define RIVET_COMMON_H
 
-#define TYPEDEF(kind, name) typedef kind name name
+#include <stdbool.h>
+#include <inttypes.h>
+#include <stddef.h>
+#include <stdlib.h>
 
+#define TYPEDEF(kind, name) typedef kind name name
+#define CAST(T, value) ((T)(value))
+#define NEW(T) ((T*)malloc(sizeof(T)))
+#define NEW_DYN_ARRAY(T, len) ((T*)malloc(sizeof(T) * len))
+
+typedef size_t usize;
 typedef void* rawptr;
 typedef char* cstr;
 
-void runtime_error(cstr msg);
+void println(const cstr msg, ...);
+void runtimeError(const cstr msg, ...);
 
 #endif

@@ -2,13 +2,37 @@
 // source code is governed by an MIT license that can be found in the LICENSE
 // file.
 
-#include <stdio.h>
+#define __STDC_WANT_LIB_EXT2__ 1
+
+#include <err.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <stdio.h>
 
 #include "./common.h"
 
-void runtime_error(cstr msg) {
-    fprintf(stderr, "[RUNTIME ERROR] %s\n", msg);
-    abort();
+void println(const cstr msg, ...) {
+    char* m = NULL;
+    va_list ap;
+    va_start(ap, msg);
+    int retval = vasprintf(&m, msg, ap);
+    va_end(ap);
+    if (retval == -1) {
+        err(EXIT_FAILURE, "println: `malloc` failed");
+    }
+    fprintf(stdout, "%s\n", m);
+}
+
+void runtimeError(const cstr msg, ...) {
+    char* m = NULL;
+    va_list ap;
+    va_start(ap, msg);
+    int retval = vasprintf(&m, msg, ap);
+    va_end(ap);
+    if (retval == -1) {
+        err(EXIT_FAILURE, "runtimeError: `malloc` failed");
+    }
+    fprintf(stderr, "Rivet-RuntimeError: %s\n", m);
+    exit(EXIT_FAILURE);
 }
 

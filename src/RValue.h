@@ -2,11 +2,8 @@
 // source code is governed by an MIT license that can be found in the LICENSE
 // file.
 
-#ifndef RIVET_RVALUE_H
-#define RIVET_RVALUE_H
-
-#include <stdbool.h>
-#include <inttypes.h>
+#ifndef RIVET_RV_H
+#define RIVET_RV_H
 
 #include "./common.h"
 
@@ -26,20 +23,20 @@ enum RValueType {
 #define RK_TRUE ((RValue){ .b = true, .type = RVT_BOOL })
 #define RK_FALSE ((RValue){ .b = false, .type = RVT_BOOL })
 
-#define _MK_RVALUE_INT(bits, val) ((RValue){ .i##bits = (val), .type = RVT_INT##bits })
-#define MK_RVALUE_INT8(val) _MK_RVALUE_INT(8, val)
-#define MK_RVALUE_INT16(val) _MK_RVALUE_INT(16, val)
-#define MK_RVALUE_INT32(val) _MK_RVALUE_INT(32, val)
-#define MK_RVALUE_INT64(val) _MK_RVALUE_INT(64, val)
+#define _RK_INT(bits, val) ((RValue){ .i##bits = (val), .type = RVT_INT##bits })
+#define RK_INT8(val) _RK_INT(8, val)
+#define RK_INT16(val) _RK_INT(16, val)
+#define RK_INT32(val) _RK_INT(32, val)
+#define RK_INT64(val) _RK_INT(64, val)
 
-#define _RVALUE_IS_TYPE(rval, type) ((rval).type == RVT_##type)
-#define RVALUE_IS_NONE(rval) ((rval).type == RVT_NONE)
-#define RVALUE_IS_BOOL(rval) ((rval).type == RVT_BOOL)
-#define RVALUE_IS_INT(rval) (((rval).type >= RVT_INT8) && ((rval).type <= RVT_INT64))
-#define RVALUE_IS_INT8(rval) _RVALUE_IS_TYPE(rval, INT8)
-#define RVALUE_IS_INT16(rval) _RVALUE_IS_TYPE(rval, INT16)
-#define RVALUE_IS_INT32(rval) _RVALUE_IS_TYPE(rval, INT32)
-#define RVALUE_IS_INT64(rval) _RVALUE_IS_TYPE(rval, INT64)
+#define _RV_IS_TYPE(rval, type) ((rval).type == RVT_##type)
+#define RV_IS_NONE(rval) ((rval).type == RVT_NONE)
+#define RV_IS_BOOL(rval) ((rval).type == RVT_BOOL)
+#define RV_IS_INT(rval) (((rval).type >= RVT_INT8) && ((rval).type <= RVT_INT64))
+#define RV_IS_INT8(rval) _RV_IS_TYPE(rval, INT8)
+#define RV_IS_INT16(rval) _RV_IS_TYPE(rval, INT16)
+#define RV_IS_INT32(rval) _RV_IS_TYPE(rval, INT32)
+#define RV_IS_INT64(rval) _RV_IS_TYPE(rval, INT64)
 
 struct RValue {
     union {
@@ -52,6 +49,7 @@ struct RValue {
     RValueType type;
 };
 
+usize RValue_toUsize(RValue* self);
 cstr RValue_toString(RValue* self);
 
 #endif
