@@ -27,10 +27,12 @@ registers = '.registers' integer
 label = identifier ':'
 
 inst =
+    'goto' (offset | identifier) : inst_goto
     'mov' reg ',' reg_or_konst : inst_mov
     'call' konst ',' konst ',' reg : inst_call
     'ret' (reg?) : inst_ret
 
+offset = integer
 reg_or_konst = reg | konst
 reg = [ 'R' '(' integer ')' ]
 konst = [ 'C' '(' integer ')' ]

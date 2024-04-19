@@ -14,6 +14,9 @@ enum ROpcode {
     ROC_NOP = 0,
 
     ROC_MOV,
+
+    ROC_GOTO,
+
     ROC_CALL,
     ROC_RETURN,
 

@@ -30,6 +30,10 @@ void RFrame_run(RFrame* self) {
                 RStack_set(&self->stack, ABS(inst.arg0), RStack_get(stack, ABS(inst.arg1)));
                 break;
 
+            case ROC_GOTO:
+                self->pc = inst.arg0;
+                break;
+
             case ROC_CALL:
                 usize func_idx = RValue_toUsize(RStack_get_ref(&self->constant_pool, ABS(inst.arg1)));
                 RFrame frame = RFunc_new_frame(

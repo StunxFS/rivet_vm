@@ -106,6 +106,7 @@ enum parsed_type {
     PARSED_INST_MOV,
     PARSED_INST_RET,
     PARSED_INST_CALL,
+    PARSED_INST_GOTO,
     PARSED_ENTRY_POINT,
     PARSED_MODULE_NAME,
     PARSED_RVM_VERSION,
@@ -147,9 +148,16 @@ struct parsed_label {
 struct parsed_inst {
     struct source_range range;
     enum parsed_type type;
+    struct owl_ref offset;
+    struct owl_ref identifier;
     struct owl_ref reg;
     struct owl_ref reg_or_konst;
     struct owl_ref konst;
+};
+
+struct parsed_offset {
+    struct source_range range;
+    struct owl_ref integer;
 };
 
 struct parsed_reg_or_konst {
@@ -191,6 +199,7 @@ struct parsed_constant_pool_decl parsed_constant_pool_decl_get(struct owl_ref);
 struct parsed_registers parsed_registers_get(struct owl_ref);
 struct parsed_label parsed_label_get(struct owl_ref);
 struct parsed_inst parsed_inst_get(struct owl_ref);
+struct parsed_offset parsed_offset_get(struct owl_ref);
 struct parsed_reg_or_konst parsed_reg_or_konst_get(struct owl_ref);
 struct parsed_reg parsed_reg_get(struct owl_ref);
 struct parsed_konst parsed_konst_get(struct owl_ref);
@@ -310,7 +319,7 @@ struct parsed_decls parsed_decls_get(struct owl_ref ref) {
     };
     result.string._tree = ref._tree;
     result.string._offset = read_tree(&offset, ref._tree);
-    result.string._type = 9;
+    result.string._type = 10;
     result.string.empty = result.string._offset == 0;
     result.constant_pool_decl._tree = ref._tree;
     result.constant_pool_decl._offset = read_tree(&offset, ref._tree);
@@ -348,11 +357,11 @@ struct parsed_constant_pool_decl parsed_constant_pool_decl_get(struct owl_ref re
     };
     result.integer._tree = ref._tree;
     result.integer._offset = read_tree(&offset, ref._tree);
-    result.integer._type = 10;
+    result.integer._type = 11;
     result.integer.empty = result.integer._offset == 0;
     result.string._tree = ref._tree;
     result.string._offset = read_tree(&offset, ref._tree);
-    result.string._type = 9;
+    result.string._type = 10;
     result.string.empty = result.string._offset == 0;
     return result;
 }
@@ -372,7 +381,7 @@ struct parsed_registers parsed_registers_get(struct owl_ref ref) {
     };
     result.integer._tree = ref._tree;
     result.integer._offset = read_tree(&offset, ref._tree);
-    result.integer._type = 10;
+    result.integer._type = 11;
     result.integer.empty = result.integer._offset == 0;
     return result;
 }
@@ -392,13 +401,15 @@ struct parsed_label parsed_label_get(struct owl_ref ref) {
     };
     result.identifier._tree = ref._tree;
     result.identifier._offset = read_tree(&offset, ref._tree);
-    result.identifier._type = 11;
+    result.identifier._type = 12;
     result.identifier.empty = result.identifier._offset == 0;
     return result;
 }
 struct parsed_inst parsed_inst_get(struct owl_ref ref) {
     if (ref.empty || ref._type != 5) {
         return (struct parsed_inst){
+            .offset.empty = true,
+            .identifier.empty = true,
             .reg.empty = true,
             .reg_or_konst.empty = true,
             .konst.empty = true,
@@ -413,22 +424,50 @@ struct parsed_inst parsed_inst_get(struct owl_ref ref) {
         .range.end = end_location,
         .type = (enum parsed_type)read_tree(&offset, ref._tree),
     };
+    result.offset._tree = ref._tree;
+    result.offset._offset = read_tree(&offset, ref._tree);
+    result.offset._type = 6;
+    result.offset.empty = result.offset._offset == 0;
+    result.identifier._tree = ref._tree;
+    result.identifier._offset = read_tree(&offset, ref._tree);
+    result.identifier._type = 12;
+    result.identifier.empty = result.identifier._offset == 0;
     result.reg._tree = ref._tree;
     result.reg._offset = read_tree(&offset, ref._tree);
-    result.reg._type = 7;
+    result.reg._type = 8;
     result.reg.empty = result.reg._offset == 0;
     result.reg_or_konst._tree = ref._tree;
     result.reg_or_konst._offset = read_tree(&offset, ref._tree);
-    result.reg_or_konst._type = 6;
+    result.reg_or_konst._type = 7;
     result.reg_or_konst.empty = result.reg_or_konst._offset == 0;
     result.konst._tree = ref._tree;
     result.konst._offset = read_tree(&offset, ref._tree);
-    result.konst._type = 8;
+    result.konst._type = 9;
     result.konst.empty = result.konst._offset == 0;
     return result;
 }
-struct parsed_reg_or_konst parsed_reg_or_konst_get(struct owl_ref ref) {
+struct parsed_offset parsed_offset_get(struct owl_ref ref) {
     if (ref.empty || ref._type != 6) {
+        return (struct parsed_offset){
+            .integer.empty = true,
+        };
+    }
+    size_t offset = ref._offset;
+    read_tree(&offset, ref._tree); // Read and ignore the 'next offset' field.
+    size_t start_location = read_tree(&offset, ref._tree);
+    size_t end_location = start_location + read_tree(&offset, ref._tree);
+    struct parsed_offset result = {
+        .range.start = start_location,
+        .range.end = end_location,
+    };
+    result.integer._tree = ref._tree;
+    result.integer._offset = read_tree(&offset, ref._tree);
+    result.integer._type = 11;
+    result.integer.empty = result.integer._offset == 0;
+    return result;
+}
+struct parsed_reg_or_konst parsed_reg_or_konst_get(struct owl_ref ref) {
+    if (ref.empty || ref._type != 7) {
         return (struct parsed_reg_or_konst){
             .reg.empty = true,
             .konst.empty = true,
@@ -444,16 +483,16 @@ struct parsed_reg_or_konst parsed_reg_or_konst_get(struct owl_ref ref) {
     };
     result.reg._tree = ref._tree;
     result.reg._offset = read_tree(&offset, ref._tree);
-    result.reg._type = 7;
+    result.reg._type = 8;
     result.reg.empty = result.reg._offset == 0;
     result.konst._tree = ref._tree;
     result.konst._offset = read_tree(&offset, ref._tree);
-    result.konst._type = 8;
+    result.konst._type = 9;
     result.konst.empty = result.konst._offset == 0;
     return result;
 }
 struct parsed_reg parsed_reg_get(struct owl_ref ref) {
-    if (ref.empty || ref._type != 7) {
+    if (ref.empty || ref._type != 8) {
         return (struct parsed_reg){
             .integer.empty = true,
         };
@@ -468,12 +507,12 @@ struct parsed_reg parsed_reg_get(struct owl_ref ref) {
     };
     result.integer._tree = ref._tree;
     result.integer._offset = read_tree(&offset, ref._tree);
-    result.integer._type = 10;
+    result.integer._type = 11;
     result.integer.empty = result.integer._offset == 0;
     return result;
 }
 struct parsed_konst parsed_konst_get(struct owl_ref ref) {
-    if (ref.empty || ref._type != 8) {
+    if (ref.empty || ref._type != 9) {
         return (struct parsed_konst){
             .integer.empty = true,
         };
@@ -488,12 +527,12 @@ struct parsed_konst parsed_konst_get(struct owl_ref ref) {
     };
     result.integer._tree = ref._tree;
     result.integer._offset = read_tree(&offset, ref._tree);
-    result.integer._type = 10;
+    result.integer._type = 11;
     result.integer.empty = result.integer._offset == 0;
     return result;
 }
 struct parsed_string parsed_string_get(struct owl_ref ref) {
-    if (ref.empty || ref._type != 9) {
+    if (ref.empty || ref._type != 10) {
         return (struct parsed_string){
             {0}
         };
@@ -518,7 +557,7 @@ struct parsed_string parsed_string_get(struct owl_ref ref) {
     return result;
 }
 struct parsed_integer parsed_integer_get(struct owl_ref ref) {
-    if (ref.empty || ref._type != 10) {
+    if (ref.empty || ref._type != 11) {
         return (struct parsed_integer){
             {0}
         };
@@ -537,7 +576,7 @@ struct parsed_integer parsed_integer_get(struct owl_ref ref) {
     return result;
 }
 struct parsed_identifier parsed_identifier_get(struct owl_ref ref) {
-    if (ref.empty || ref._type != 11) {
+    if (ref.empty || ref._type != 12) {
         return (struct parsed_identifier){
             {0}
         };
@@ -631,30 +670,39 @@ static size_t finish_node(uint32_t rule, uint32_t choice, size_t next_sibling, s
     case 5: {
         switch (choice) {
         case 0:
-            write_tree(tree, PARSED_INST_MOV);
+            write_tree(tree, PARSED_INST_GOTO);
             break;
         case 1:
-            write_tree(tree, PARSED_INST_CALL);
+            write_tree(tree, PARSED_INST_MOV);
             break;
         case 2:
+            write_tree(tree, PARSED_INST_CALL);
+            break;
+        case 3:
             write_tree(tree, PARSED_INST_RET);
             break;
         }
         write_tree(tree, slots[0]);
         write_tree(tree, slots[1]);
         write_tree(tree, slots[2]);
+        write_tree(tree, slots[3]);
+        write_tree(tree, slots[4]);
         break;
     }
     case 6: {
         write_tree(tree, slots[0]);
-        write_tree(tree, slots[1]);
         break;
     }
     case 7: {
         write_tree(tree, slots[0]);
+        write_tree(tree, slots[1]);
         break;
     }
     case 8: {
+        write_tree(tree, slots[0]);
+        break;
+    }
+    case 9: {
         write_tree(tree, slots[0]);
         break;
     }
@@ -668,31 +716,31 @@ static size_t finish_token(uint32_t rule, size_t next_sibling, void *info) {
     size_t offset = tree->next_offset;
     write_tree(tree, next_sibling ? offset - next_sibling : 0);
     switch (rule) {
-    case 9: {
-        size_t offset9 = tree->next_string_token_offset;
-        if (offset9 == 0)
-            abort();
-        write_tree(tree, offset9);
-        tree->next_string_token_offset = offset9;
-        tree->next_string_token_offset -= read_tree(&offset9, tree);
-        break;
-    }
     case 10: {
-        size_t offset10 = tree->next_integer_token_offset;
+        size_t offset10 = tree->next_string_token_offset;
         if (offset10 == 0)
             abort();
         write_tree(tree, offset10);
-        tree->next_integer_token_offset = offset10;
-        tree->next_integer_token_offset -= read_tree(&offset10, tree);
+        tree->next_string_token_offset = offset10;
+        tree->next_string_token_offset -= read_tree(&offset10, tree);
         break;
     }
     case 11: {
-        size_t offset11 = tree->next_identifier_token_offset;
+        size_t offset11 = tree->next_integer_token_offset;
         if (offset11 == 0)
             abort();
         write_tree(tree, offset11);
-        tree->next_identifier_token_offset = offset11;
-        tree->next_identifier_token_offset -= read_tree(&offset11, tree);
+        tree->next_integer_token_offset = offset11;
+        tree->next_integer_token_offset -= read_tree(&offset11, tree);
+        break;
+    }
+    case 12: {
+        size_t offset12 = tree->next_identifier_token_offset;
+        if (offset12 == 0)
+            abort();
+        write_tree(tree, offset12);
+        tree->next_identifier_token_offset = offset12;
+        tree->next_identifier_token_offset -= read_tree(&offset12, tree);
         break;
     }
     default:
@@ -731,6 +779,7 @@ static void parsed_constant_pool_decl_print(struct owl_tree *tree, struct owl_re
 static void parsed_registers_print(struct owl_tree *tree, struct owl_ref ref, const char *slot_name, int indent);
 static void parsed_label_print(struct owl_tree *tree, struct owl_ref ref, const char *slot_name, int indent);
 static void parsed_inst_print(struct owl_tree *tree, struct owl_ref ref, const char *slot_name, int indent);
+static void parsed_offset_print(struct owl_tree *tree, struct owl_ref ref, const char *slot_name, int indent);
 static void parsed_reg_or_konst_print(struct owl_tree *tree, struct owl_ref ref, const char *slot_name, int indent);
 static void parsed_reg_print(struct owl_tree *tree, struct owl_ref ref, const char *slot_name, int indent);
 static void parsed_konst_print(struct owl_tree *tree, struct owl_ref ref, const char *slot_name, int indent);
@@ -860,6 +909,9 @@ static void parsed_inst_print(struct owl_tree *tree, struct owl_ref ref, const c
         if (strcmp("inst", slot_name))
             printf("@%s", slot_name);
         switch (it.type) {
+        case PARSED_INST_GOTO:
+            printf(" : INST_GOTO");
+            break;
         case PARSED_INST_MOV:
             printf(" : INST_MOV");
             break;
@@ -873,9 +925,24 @@ static void parsed_inst_print(struct owl_tree *tree, struct owl_ref ref, const c
             break;
         }
         printf(" (%zu - %zu)\n", it.range.start, it.range.end);
+        parsed_offset_print(tree, it.offset, "offset", indent + 1);
+        parsed_identifier_print(tree, it.identifier, "identifier", indent + 1);
         parsed_reg_print(tree, it.reg, "reg", indent + 1);
         parsed_reg_or_konst_print(tree, it.reg_or_konst, "reg_or_konst", indent + 1);
         parsed_konst_print(tree, it.konst, "konst", indent + 1);
+        ref = owl_next(ref);
+    }
+}
+static void parsed_offset_print(struct owl_tree *tree, struct owl_ref ref, const char *slot_name, int indent) {
+    int i;
+    while (!ref.empty) {
+        struct parsed_offset it = parsed_offset_get(ref);
+        for (i = 0; i < indent; ++i) printf("  ");
+        printf("offset");
+        if (strcmp("offset", slot_name))
+            printf("@%s", slot_name);
+        printf(" (%zu - %zu)\n", it.range.start, it.range.end);
+        parsed_integer_print(tree, it.integer, "integer", indent + 1);
         ref = owl_next(ref);
     }
 }
@@ -1187,7 +1254,7 @@ static bool OWL_DONT_INLINE owl_default_tokenizer_advance(struct owl_default_tok
                 end_token = false;
                 comment = false;
                 custom_whitespace = false;
-                token = 27;
+                token = 28;
             }
         }
         ) IF_NUMBER_TOKEN(char_is_numeric(c) || (c == '.' && char_is_numeric(text[offset + 1])), {
@@ -1212,7 +1279,7 @@ static bool OWL_DONT_INLINE owl_default_tokenizer_advance(struct owl_default_tok
                     end_token = false;
                     comment = false;
                     custom_whitespace = false;
-                    token = 26;
+                    token = 27;
                     break;
                 }
                 if (text[string_offset] == '\\') {
@@ -1233,7 +1300,7 @@ static bool OWL_DONT_INLINE owl_default_tokenizer_advance(struct owl_default_tok
                 end_token = false;
                 comment = false;
                 custom_whitespace = false;
-                token = 28;
+                token = 29;
             }
         }
         ) if (custom_whitespace) {
@@ -1256,16 +1323,16 @@ static bool OWL_DONT_INLINE owl_default_tokenizer_advance(struct owl_default_tok
         }
         if (end_token && number_of_tokens + 1 >= 4096) break;
         if (!encode_token_length(run, &lengths_size, token_length, whitespace)) break;
-        if (token == 28) {
+        if (token == 29) {
             write_identifier_token(offset, token_length, tokenizer->info);
         }
-        else if (token == 27) {
+        else if (token == 28) {
             write_integer_token(offset, token_length, integer, tokenizer->info);
         }
         else if (token == 4294967295U) {
             IGNORE_TOKEN_WRITE(offset, token_length, number, tokenizer->info);
         }
-        else IF_STRING_TOKEN(token == 26, {
+        else IF_STRING_TOKEN(token == 27, {
             size_t content_offset = offset + 1;
             size_t content_length = token_length - 2;
             const char *string = text + content_offset;
@@ -1679,7 +1746,7 @@ struct fill_run_continuation {
     int error;
 };
 static void bracket_entry_state(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index, uint32_t mask0);
-static void (*state_funcs[53])(struct owl_token_run *, struct fill_run_state *, uint16_t);
+static void (*state_funcs[56])(struct owl_token_run *, struct fill_run_state *, uint16_t);
 static void state_func_6(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
     uint32_t token = run->tokens[token_index];
     switch (token) {
@@ -1690,7 +1757,7 @@ static void state_func_6(struct owl_token_run *run, struct fill_run_state *top, 
 static void state_func_4(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
     uint32_t token = run->tokens[token_index];
     switch (token) {
-    case 4: top->state = 26; return;
+    case 4: top->state = 29; return;
     default: top->cont->error = 1; return;
     }
 }
@@ -1701,117 +1768,108 @@ static void state_func_7(struct owl_token_run *run, struct fill_run_state *top, 
     default: top->cont->error = 1; return;
     }
 }
-static void state_func_14(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
+static void state_func_15(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
     uint32_t token = run->tokens[token_index];
     switch (token) {
-    case 17: top->state = 15; return;
+    case 17: top->state = 16; return;
     default: top->cont->error = 1; return;
     }
 }
-static void state_func_17(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
+static void state_func_18(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
     uint32_t token = run->tokens[token_index];
     switch (token) {
-    case 19: top->state = 18; return;
-    default: top->cont->error = 1; return;
-    }
-}
-static void state_func_19(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
-    uint32_t token = run->tokens[token_index];
-    switch (token) {
-    case 19: top->state = 20; return;
-    default: top->cont->error = 1; return;
-    }
-}
-static void state_func_22(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
-    uint32_t token = run->tokens[token_index];
-    switch (token) {
-    case 19: top->state = 23; return;
-    default: top->cont->error = 1; return;
-    }
-}
-static void state_func_5(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
-    uint32_t token = run->tokens[token_index];
-    switch (token) {
-    case 26: top->state = 6; return;
-    default: top->cont->error = 1; return;
-    }
-}
-static void state_func_34(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
-    uint32_t token = run->tokens[token_index];
-    switch (token) {
-    case 26: top->state = 35; return;
-    default: top->cont->error = 1; return;
-    }
-}
-static void state_func_3(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
-    uint32_t token = run->tokens[token_index];
-    switch (token) {
-    case 26: top->state = 41; return;
-    default: top->cont->error = 1; return;
-    }
-}
-static void state_func_2(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
-    uint32_t token = run->tokens[token_index];
-    switch (token) {
-    case 26: top->state = 42; return;
-    default: top->cont->error = 1; return;
-    }
-}
-static void state_func_1(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
-    uint32_t token = run->tokens[token_index];
-    switch (token) {
-    case 26: top->state = 43; return;
-    default: top->cont->error = 1; return;
-    }
-}
-static void state_func_8(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
-    uint32_t token = run->tokens[token_index];
-    switch (token) {
-    case 27: top->state = 9; return;
-    default: top->cont->error = 1; return;
-    }
-}
-static void state_func_33(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
-    uint32_t token = run->tokens[token_index];
-    switch (token) {
-    case 27: top->state = 36; return;
-    default: top->cont->error = 1; return;
-    }
-}
-static void state_func_32(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
-    uint32_t token = run->tokens[token_index];
-    switch (token) {
-    case 27: top->state = 37; return;
-    default: top->cont->error = 1; return;
-    }
-}
-static void state_func_31(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
-    uint32_t token = run->tokens[token_index];
-    switch (token) {
-    case 27: top->state = 38; return;
-    default: top->cont->error = 1; return;
-    }
-}
-static void state_func_30(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
-    uint32_t token = run->tokens[token_index];
-    switch (token) {
-    case 27: top->state = 39; return;
+    case 20: top->state = 19; return;
     default: top->cont->error = 1; return;
     }
 }
 static void state_func_20(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
     uint32_t token = run->tokens[token_index];
     switch (token) {
-    case 29: top->state = 21; return;
-    default:
-        bracket_entry_state(run, top, token_index, 1);
-        return;
+    case 20: top->state = 21; return;
+    default: top->cont->error = 1; return;
     }
 }
-static void state_func_11(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
+static void state_func_23(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
     uint32_t token = run->tokens[token_index];
     switch (token) {
-    case 29: top->state = 22; return;
+    case 20: top->state = 24; return;
+    default: top->cont->error = 1; return;
+    }
+}
+static void state_func_5(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
+    uint32_t token = run->tokens[token_index];
+    switch (token) {
+    case 27: top->state = 6; return;
+    default: top->cont->error = 1; return;
+    }
+}
+static void state_func_37(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
+    uint32_t token = run->tokens[token_index];
+    switch (token) {
+    case 27: top->state = 38; return;
+    default: top->cont->error = 1; return;
+    }
+}
+static void state_func_3(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
+    uint32_t token = run->tokens[token_index];
+    switch (token) {
+    case 27: top->state = 44; return;
+    default: top->cont->error = 1; return;
+    }
+}
+static void state_func_2(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
+    uint32_t token = run->tokens[token_index];
+    switch (token) {
+    case 27: top->state = 45; return;
+    default: top->cont->error = 1; return;
+    }
+}
+static void state_func_1(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
+    uint32_t token = run->tokens[token_index];
+    switch (token) {
+    case 27: top->state = 46; return;
+    default: top->cont->error = 1; return;
+    }
+}
+static void state_func_8(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
+    uint32_t token = run->tokens[token_index];
+    switch (token) {
+    case 28: top->state = 9; return;
+    default: top->cont->error = 1; return;
+    }
+}
+static void state_func_36(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
+    uint32_t token = run->tokens[token_index];
+    switch (token) {
+    case 28: top->state = 39; return;
+    default: top->cont->error = 1; return;
+    }
+}
+static void state_func_35(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
+    uint32_t token = run->tokens[token_index];
+    switch (token) {
+    case 28: top->state = 40; return;
+    default: top->cont->error = 1; return;
+    }
+}
+static void state_func_34(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
+    uint32_t token = run->tokens[token_index];
+    switch (token) {
+    case 28: top->state = 41; return;
+    default: top->cont->error = 1; return;
+    }
+}
+static void state_func_33(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
+    uint32_t token = run->tokens[token_index];
+    switch (token) {
+    case 28: top->state = 42; return;
+    default: top->cont->error = 1; return;
+    }
+}
+static void state_func_21(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
+    uint32_t token = run->tokens[token_index];
+    switch (token) {
+    case 30: top->state = 22; return;
     default:
         bracket_entry_state(run, top, token_index, 1);
         return;
@@ -1820,92 +1878,109 @@ static void state_func_11(struct owl_token_run *run, struct fill_run_state *top,
 static void state_func_12(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
     uint32_t token = run->tokens[token_index];
     switch (token) {
-    case 30: top->state = 17; return;
+    case 30: top->state = 23; return;
     default:
-        bracket_entry_state(run, top, token_index, 2);
+        bracket_entry_state(run, top, token_index, 1);
         return;
     }
 }
-static void state_func_18(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
+static void state_func_13(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
     uint32_t token = run->tokens[token_index];
     switch (token) {
-    case 30: top->state = 19; return;
+    case 31: top->state = 18; return;
     default:
         bracket_entry_state(run, top, token_index, 2);
         return;
     }
 }
-static void state_func_45(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
+static void state_func_19(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
+    uint32_t token = run->tokens[token_index];
+    switch (token) {
+    case 31: top->state = 20; return;
+    default:
+        bracket_entry_state(run, top, token_index, 2);
+        return;
+    }
+}
+static void state_func_48(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
     if (!(1 & top->reachability_mask[0])) {
         top->cont->error = -1;
         return;
     }
     uint32_t token = run->tokens[token_index];
     switch (token) {
-    case 22: top->state = 50; return;
+    case 23: top->state = 53; return;
     default: top->cont->error = 1; return;
     }
 }
-static void state_func_46(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
+static void state_func_49(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
     if (!(2 & top->reachability_mask[0])) {
         top->cont->error = -1;
         return;
     }
     uint32_t token = run->tokens[token_index];
     switch (token) {
-    case 22: top->state = 47; return;
+    case 23: top->state = 50; return;
     default: top->cont->error = 1; return;
     }
 }
-static void state_func_48(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
+static void state_func_51(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
     if (!(2 & top->reachability_mask[0])) {
         top->cont->error = -1;
         return;
     }
     uint32_t token = run->tokens[token_index];
     switch (token) {
-    case 24: top->state = 49; return;
+    case 25: top->state = 52; return;
     default: top->cont->error = 1; return;
     }
 }
-static void state_func_47(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
+static void state_func_50(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
     if (!(2 & top->reachability_mask[0])) {
         top->cont->error = -1;
         return;
     }
     uint32_t token = run->tokens[token_index];
     switch (token) {
-    case 27: top->state = 48; return;
+    case 28: top->state = 51; return;
     default: top->cont->error = 1; return;
     }
 }
-static void state_func_29(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
+static void state_func_32(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
     uint32_t token = run->tokens[token_index];
     switch (token) {
-    case 9: top->state = 40; return;
-    case 10: top->state = 40; return;
+    case 9: top->state = 43; return;
+    case 10: top->state = 43; return;
     default: top->cont->error = 1; return;
     }
 }
-static void state_func_23(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
+static void state_func_11(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
     uint32_t token = run->tokens[token_index];
     switch (token) {
-    case 29: top->state = 24; return;
+    case 28: top->state = 27; return;
+    case 29: top->state = 28; return;
+    default: top->cont->error = 1; return;
+    }
+}
+static void state_func_24(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
+    uint32_t token = run->tokens[token_index];
+    switch (token) {
     case 30: top->state = 25; return;
+    case 31: top->state = 26; return;
     default:
         bracket_entry_state(run, top, token_index, 3);
         return;
     }
 }
-static void state_func_44(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
+static void state_func_47(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
     if (!(3 & top->reachability_mask[0])) {
         top->cont->error = -1;
         return;
     }
     uint32_t token = run->tokens[token_index];
     switch (token) {
-    case 23: top->state = 45; return;
-    case 25: top->state = 46; return;
+    case 24: top->state = 48; return;
+    case 26: top->state = 49; return;
     default: top->cont->error = 1; return;
     }
 }
@@ -1925,42 +2000,82 @@ static void state_func_9(struct owl_token_run *run, struct fill_run_state *top, 
     switch (token) {
     case 5: top->state = 10; return;
     case 18: top->state = 11; return;
-    case 20: top->state = 12; return;
+    case 19: top->state = 12; return;
     case 21: top->state = 13; return;
-    case 28: top->state = 14; return;
+    case 22: top->state = 14; return;
+    case 29: top->state = 15; return;
     default: top->cont->error = 1; return;
     }
 }
-static void state_func_13(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
+static void state_func_14(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
     uint32_t token = run->tokens[token_index];
     switch (token) {
     case 5: top->state = 10; return;
     case 18: top->state = 11; return;
-    case 20: top->state = 12; return;
+    case 19: top->state = 12; return;
     case 21: top->state = 13; return;
-    case 28: top->state = 14; return;
-    case 29: top->state = 16; return;
+    case 22: top->state = 14; return;
+    case 29: top->state = 15; return;
+    case 30: top->state = 17; return;
     default:
         bracket_entry_state(run, top, token_index, 1);
         return;
     }
 }
-static void state_func_26(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
+static void state_func_29(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
     uint32_t token = run->tokens[token_index];
     switch (token) {
-    case 5: top->state = 27; return;
-    case 7: top->state = 28; return;
-    case 8: top->state = 29; return;
-    case 11: top->state = 30; return;
-    case 12: top->state = 31; return;
-    case 13: top->state = 32; return;
-    case 14: top->state = 33; return;
-    case 15: top->state = 34; return;
+    case 5: top->state = 30; return;
+    case 7: top->state = 31; return;
+    case 8: top->state = 32; return;
+    case 11: top->state = 33; return;
+    case 12: top->state = 34; return;
+    case 13: top->state = 35; return;
+    case 14: top->state = 36; return;
+    case 15: top->state = 37; return;
     default: top->cont->error = 1; return;
     }
 }
-static void state_func_49(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
+static void state_func_52(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
     if (!(2 & top->reachability_mask[0])) {
+        top->cont->error = -1;
+        return;
+    }
+    if (top->cont->top_index == 0) {
+        top->cont->error = 1;
+        return;
+    }
+    top->cont->top_index--;
+    top--;
+    run->tokens[token_index] = 31;
+    run->states[token_index] = top->state;
+    state_funcs[top->state](run, top, token_index);
+    return;
+}
+static void state_func_54(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
+    if (!(1 & top->reachability_mask[0])) {
+        top->cont->error = -1;
+        return;
+    }
+    uint32_t token = run->tokens[token_index];
+    switch (token) {
+    case 25: top->state = 55; return;
+    default: top->cont->error = 1; return;
+    }
+}
+static void state_func_53(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
+    if (!(1 & top->reachability_mask[0])) {
+        top->cont->error = -1;
+        return;
+    }
+    uint32_t token = run->tokens[token_index];
+    switch (token) {
+    case 28: top->state = 54; return;
+    default: top->cont->error = 1; return;
+    }
+}
+static void state_func_55(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
+    if (!(1 & top->reachability_mask[0])) {
         top->cont->error = -1;
         return;
     }
@@ -1975,59 +2090,21 @@ static void state_func_49(struct owl_token_run *run, struct fill_run_state *top,
     state_funcs[top->state](run, top, token_index);
     return;
 }
-static void state_func_51(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
-    if (!(1 & top->reachability_mask[0])) {
-        top->cont->error = -1;
-        return;
-    }
-    uint32_t token = run->tokens[token_index];
-    switch (token) {
-    case 24: top->state = 52; return;
-    default: top->cont->error = 1; return;
-    }
-}
-static void state_func_50(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
-    if (!(1 & top->reachability_mask[0])) {
-        top->cont->error = -1;
-        return;
-    }
-    uint32_t token = run->tokens[token_index];
-    switch (token) {
-    case 27: top->state = 51; return;
-    default: top->cont->error = 1; return;
-    }
-}
-static void state_func_52(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index) {
-    if (!(1 & top->reachability_mask[0])) {
-        top->cont->error = -1;
-        return;
-    }
-    if (top->cont->top_index == 0) {
-        top->cont->error = 1;
-        return;
-    }
-    top->cont->top_index--;
-    top--;
-    run->tokens[token_index] = 29;
-    run->states[token_index] = top->state;
-    state_funcs[top->state](run, top, token_index);
-    return;
-}
-static void (*state_funcs[53])(struct owl_token_run *, struct fill_run_state *, uint16_t) = {
+static void (*state_funcs[56])(struct owl_token_run *, struct fill_run_state *, uint16_t) = {
     state_func_0, state_func_1, state_func_2, state_func_3,
     state_func_4, state_func_5, state_func_6, state_func_7,
     state_func_8, state_func_9, state_func_0, state_func_11,
-    state_func_12, state_func_13, state_func_14, state_func_9,
-    state_func_9, state_func_17, state_func_18, state_func_19,
-    state_func_20, state_func_9, state_func_22, state_func_23,
-    state_func_9, state_func_9, state_func_26, state_func_0,
-    state_func_26, state_func_29, state_func_30, state_func_31,
-    state_func_32, state_func_33, state_func_34, state_func_26,
-    state_func_26, state_func_26, state_func_26, state_func_26,
-    state_func_26, state_func_0, state_func_0, state_func_0,
-    state_func_44, state_func_45, state_func_46, state_func_47,
+    state_func_12, state_func_13, state_func_14, state_func_15,
+    state_func_9, state_func_9, state_func_18, state_func_19,
+    state_func_20, state_func_21, state_func_9, state_func_23,
+    state_func_24, state_func_9, state_func_9, state_func_9,
+    state_func_9, state_func_29, state_func_0, state_func_29,
+    state_func_32, state_func_33, state_func_34, state_func_35,
+    state_func_36, state_func_37, state_func_29, state_func_29,
+    state_func_29, state_func_29, state_func_29, state_func_29,
+    state_func_0, state_func_0, state_func_0, state_func_47,
     state_func_48, state_func_49, state_func_50, state_func_51,
-    state_func_52,};
+    state_func_52, state_func_53, state_func_54, state_func_55,};
 static void bracket_entry_state(struct owl_token_run *run, struct fill_run_state *top, uint16_t token_index, uint32_t mask0) {
     struct fill_run_continuation *cont = top->cont;
     cont->top_index++;
@@ -2045,8 +2122,8 @@ static void bracket_entry_state(struct owl_token_run *run, struct fill_run_state
         top++;
     top->cont = cont;
     top->reachability_mask[0] = mask0;
-    run->states[token_index] = 44;
-    state_func_44(run, top, token_index);
+    run->states[token_index] = 47;
+    state_func_47(run, top, token_index);
     if (top->cont->error == -1)
         top->cont->error = 1;
 }
@@ -2100,10 +2177,10 @@ static void parse_string(struct owl_tree *tree, const char *string) {
     switch (top.state) {
     case 0:
     case 10:
-    case 27:
-    case 41:
-    case 42:
-    case 43:
+    case 30:
+    case 44:
+    case 45:
+    case 46:
         break;
     default:
         tree->error = ERROR_MORE_INPUT_NEEDED;
@@ -2186,51 +2263,59 @@ static bool fill_run_states(struct owl_token_run *run, struct fill_run_continuat
 static const uint16_t actions[] = {
 0,0,4096,0,4096,4096,0,4096,32768,12288,16384,0,4096,32768,12289,16384,0,4096,32768,12290,16384,0,4096,32768,12291,0,4096,32768,12292,0,
 4096,32769,12288,0,4096,32769,12289,0,4096,32769,12290,16384,0,4096,32769,12291,16384,0,4096,32769,12292,16384,0,4096,32769,12293,16384,0,4096,32769,
-12294,16385,0,4096,32770,16384,0,4096,32771,0,4096,32772,12288,32769,32768,0,4096,32772,12288,32769,32769,0,4096,32772,12289,32768,0,4096,32772,12290,
-0,4096,32772,12290,32768,0,16384,0,32768,0,32768,12288,16384,0,32768,12289,16384,0,32768,12290,16384,0,32768,12291,0,32768,12292,0,32769,12288,
-0,32769,12289,0,32769,12290,16384,0,32769,12291,16384,0,32769,12292,16384,0,32769,12293,16384,0,32769,12294,16385,0,32770,0,32770,16384,0,32771,
-0,32772,12288,32769,32768,0,32772,12288,32769,32769,0,32772,12289,32768,0,32772,12290,0,32772,12290,32768,0,};
-static const uint8_t action_table[256][2][7] = {
-{{44,43,3,90,0,0,0,},{246,112,15,98,0,0,0,},},{{20,85,28,118,128,1,0,},},{{98,144,7,98,120,0,0,},},{{118,84,21,118,92,1,0,},},{{0}},{{90,60,5,110,104,0,0,},},
-{{45,3,6,90,0,0,0,},},{{135,104,11,98,0,0,0,},},{{118,32,27,48,255,0,0,},},{{131,156,8,98,0,0,0,},},{{242,53,20,118,8,0,0,},},{{131,148,8,98,0,0,0,},},
-{{89,36,5,110,204,1,0,},},{{0}},{{20,61,28,118,128,1,0,},},{{91,96,5,110,204,1,0,},},{{0}},{{44,175,3,90,0,0,0,},{173,148,14,98,0,0,0,},},{{98,120,27,135,152,0,0,},},
-{{110,52,21,118,148,2,0,},},{{42,43,1,90,0,0,0,},},{{196,65,21,118,8,0,0,},},{{91,8,26,42,163,1,0,},},{{89,104,5,92,192,1,0,},},{{60,195,24,59,3,0,0,},
-{18,175,0,90,0,0,0,},},{{118,60,21,118,92,1,0,},},{{246,152,15,98,0,0,0,},},{{136,148,12,98,0,0,0,},},{{0}},{{147,104,13,98,0,0,0,},},{{18,3,0,90,0,0,0,},},
-{{92,140,7,98,216,1,0,},},{{44,171,3,90,0,0,0,},{90,104,5,92,88,0,0,},},{{136,104,12,98,0,0,0,},},{{48,31,16,47,3,0,0,},},{{98,140,7,98,120,0,0,},},
-{{90,152,5,92,88,0,0,},},{{135,160,11,98,0,0,0,},},{{118,64,21,118,92,1,0,},},{{0}},{{89,148,5,92,192,1,0,},},{{89,112,5,92,192,1,0,},},{{147,112,13,98,0,0,0,},},
-{{0}},{{0}},{{89,64,5,110,204,1,0,},},{{110,64,21,118,148,2,0,},},{{43,175,2,90,0,0,0,},},{{110,80,29,63,135,210,12,},},{{110,92,29,63,95,218,12,},},{{47,27,4,46,11,0,0,},
-{89,60,5,110,204,1,0,},},{{135,152,11,98,0,0,0,},},{{92,104,7,98,216,1,0,},},{{89,12,26,43,179,1,0,},},{{43,43,2,90,0,0,0,},},{{0}},{{0}},{{135,112,11,98,0,0,0,},},
-{{43,111,2,90,0,0,0,},},{{98,116,9,131,136,0,0,},},{{45,171,6,90,0,0,0,},{91,140,5,92,192,1,0,},},{{57,179,25,55,3,0,0,},{242,97,20,118,8,0,0,},},
-{{56,179,23,55,3,0,0,},{242,101,20,118,8,0,0,},},{{43,3,2,90,0,0,0,},},{{89,252,63,89,0,100,1,},},{{89,144,5,92,192,1,0,},},{{98,104,7,98,120,0,0,},},
-{{90,8,26,42,51,0,0,},},{{173,104,14,98,0,0,0,},},{{92,136,26,246,48,2,0,},},{{91,100,5,110,204,1,0,},},{{91,64,5,110,204,1,0,},},{{0}},{{136,144,12,98,0,0,0,},},
-{{91,52,5,110,204,1,0,},},{{136,152,12,98,0,0,0,},},{{246,160,15,98,0,0,0,},},{{43,167,2,90,0,0,0,},},{{118,96,21,118,92,1,0,},},{{131,104,8,98,0,0,0,},},
-{{0}},{{131,152,8,98,0,0,0,},},{{92,116,10,131,228,1,0,},},{{98,124,27,136,172,0,0,},},{{98,16,4,44,11,0,0,},},{{92,124,27,136,0,2,0,},},{{43,171,2,90,0,0,0,},},
-{{246,148,15,98,0,0,0,},},{{135,148,11,98,0,0,0,},},{{42,167,1,90,0,0,0,},},{{196,53,21,118,8,0,0,},},{{0}},{{45,43,6,90,0,0,0,},},{{50,71,19,49,11,0,0,},
-{91,104,5,92,192,1,0,},},{{90,112,5,92,88,0,0,},},{{98,156,7,98,120,0,0,},},{{110,32,27,48,75,2,0,},},{{63,207,24,62,3,0,0,},},{{91,148,5,92,192,1,0,},},
-{{0}},{{92,120,27,135,240,1,0,},},{{89,96,5,110,204,1,0,},},{{89,140,5,92,192,1,0,},},{{89,4,26,18,147,1,0,},},{{20,101,28,118,128,1,0,},},{{0}},{{90,12,26,43,71,0,0,},},
-{{196,61,21,118,8,0,0,},},{{242,37,20,118,8,0,0,},},{{91,4,26,18,147,1,0,},},{{246,104,15,98,0,0,0,},},{{246,140,15,98,0,0,0,},},{{18,43,0,90,0,0,0,},},
-{{131,144,8,98,0,0,0,},},{{0}},{{91,144,5,92,192,1,0,},},{{196,97,21,118,8,0,0,},},{{92,116,9,131,228,1,0,},},{{54,91,19,53,19,0,0,},},{{118,100,21,118,92,1,0,},},
-{{90,4,26,18,31,0,0,},},{{0}},{{91,252,63,89,4,100,1,},},{{61,183,22,56,3,0,0,},{90,36,5,110,104,0,0,},},{{147,140,13,98,0,0,0,},},{{98,148,7,98,120,0,0,},},
-{{131,160,8,98,0,0,0,},},{{91,160,5,92,192,1,0,},},{{46,23,26,45,131,1,0,},{89,52,5,110,204,1,0,},},{{44,111,3,90,0,0,0,},},{{90,160,5,92,88,0,0,},},
-{{0}},{{135,156,11,98,0,0,0,},},{{136,160,12,98,0,0,0,},},{{92,160,7,98,216,1,0,},},{{173,140,14,98,0,0,0,},},{{246,144,15,98,0,0,0,},},{{0}},{{92,112,7,98,216,1,0,},},
-{{0}},{{98,116,10,131,136,0,0,},},{{91,36,5,110,204,1,0,},},{{42,3,1,90,0,0,0,},},{{0}},{{59,191,27,58,131,1,0,},{118,92,29,63,27,217,12,},},{{20,97,28,118,128,1,0,},},
-{{92,128,27,147,16,2,0,},},{{42,175,1,90,0,0,0,},},{{118,56,17,20,13,1,0,},},{{42,111,1,90,0,0,0,},},{{98,152,7,98,120,0,0,},},{{90,252,63,89,8,100,1,},},
-{{91,60,5,110,204,1,0,},},{{173,156,14,98,0,0,0,},},{{62,203,27,61,131,1,0,},{90,64,5,110,104,0,0,},},{{96,66,18,118,8,0,0,},},{{89,100,5,110,204,1,0,},},
-{{45,111,6,90,0,0,0,},{96,98,18,118,8,0,0,},},{{0}},{{90,148,5,92,88,0,0,},},{{147,156,13,98,0,0,0,},},{{135,144,11,98,0,0,0,},},{{147,148,13,98,0,0,0,},},
-{{118,52,29,63,111,17,7,},},{{0}},{{96,62,18,118,8,0,0,},},{{173,144,14,98,0,0,0,},},{{118,36,21,118,92,1,0,},},{{18,111,0,90,0,0,0,},},{{96,86,18,118,8,0,0,},},
-{{44,3,3,90,0,0,0,},{131,112,8,98,0,0,0,},},{{42,171,1,90,0,0,0,},},{{89,8,26,42,163,1,0,},},{{196,37,21,118,8,0,0,},},{{118,92,30,60,51,217,12,},},
-{{110,36,21,118,148,2,0,},},{{91,156,5,92,192,1,0,},},{{90,140,5,92,88,0,0,},},{{173,112,14,98,0,0,0,},},{{0}},{{92,132,27,173,32,2,0,},},{{89,160,5,92,192,1,0,},},
-{{0}},{{90,52,5,110,104,0,0,},},{{0}},{{147,152,13,98,0,0,0,},},{{96,102,18,118,8,0,0,},},{{58,187,22,57,3,0,0,},{110,84,21,118,148,2,0,},},{{196,85,21,118,8,0,0,},},
-{{131,140,8,98,0,0,0,},},{{136,140,12,98,0,0,0,},},{{110,56,17,20,85,2,0,},},{{110,92,30,60,115,218,12,},},{{110,60,21,118,148,2,0,},},{{92,144,7,98,216,1,0,},},
-{{0}},{{52,79,19,51,11,0,0,},},{{0}},{{173,160,14,98,0,0,0,},},{{242,65,20,118,8,0,0,},},{{0}},{{91,152,5,92,192,1,0,},},{{18,167,0,90,0,0,0,},},{{118,52,21,118,92,1,0,},},
-{{147,144,13,98,0,0,0,},},{{246,156,15,98,0,0,0,},},{{242,85,20,118,8,0,0,},},{{45,167,6,90,0,0,0,},},{{20,37,28,118,128,1,0,},},{{136,112,12,98,0,0,0,},},
-{{55,175,63,55,3,100,1,},{90,96,5,110,104,0,0,},},{{91,112,5,92,192,1,0,},},{{0}},{{98,132,27,173,212,0,0,},},{{90,144,5,92,88,0,0,},},{{0}},{{89,84,5,110,204,1,0,},},
-{{20,65,28,118,128,1,0,},},{{89,156,5,92,192,1,0,},},{{92,148,7,98,216,1,0,},},{{0}},{{196,101,21,118,8,0,0,},},{{135,140,11,98,0,0,0,},},{{147,160,13,98,0,0,0,},},
-{{92,152,7,98,216,1,0,},},{{0}},{{53,47,29,63,139,129,9,},},{{0}},{{98,128,27,147,192,0,0,},},{{118,80,29,63,75,209,12,},},{{51,75,30,60,67,202,12,},},{{110,52,29,63,163,18,7,},},
-{{173,152,14,98,0,0,0,},},{{110,100,21,118,148,2,0,},},{{96,38,18,118,8,0,0,},},{{90,100,5,110,104,0,0,},},{{98,112,7,98,120,0,0,},},{{45,175,6,90,0,0,0,},
-{90,156,5,92,88,0,0,},},{{49,51,30,60,67,202,7,},{96,54,18,118,8,0,0,},},{{90,84,5,110,104,0,0,},},{{98,160,7,98,120,0,0,},},{{18,171,0,90,0,0,0,},},
-{{91,84,5,110,204,1,0,},},{{44,167,3,90,0,0,0,},{89,152,5,92,192,1,0,},},{{20,53,28,118,128,1,0,},},{{0}},{{110,96,21,118,148,2,0,},},{{91,12,26,43,179,1,0,},},
-{{242,61,20,118,8,0,0,},},{{92,156,7,98,216,1,0,},},{{136,156,12,98,0,0,0,},},{{98,136,26,246,232,0,0,},},{{0}},{{92,16,4,44,3,0,0,},},{{0}},{{0}},};
+12294,16385,0,4096,32770,16384,0,4096,32771,0,4096,32772,12288,16385,0,4096,32772,12288,32768,16384,0,4096,32772,12289,32771,32768,0,4096,32772,12289,
+32771,32769,0,4096,32772,12290,32770,0,4096,32772,12291,0,4096,32772,12291,32770,0,16384,0,32768,12288,16384,0,32768,12289,16384,0,32768,12290,16384,
+0,32768,12291,0,32768,12292,0,32769,12288,0,32769,12289,0,32769,12290,16384,0,32769,12291,16384,0,32769,12292,16384,0,32769,12293,16384,0,32769,
+12294,16385,0,32770,0,32770,16384,0,32771,0,32772,0,32772,12288,16385,0,32772,12288,32768,16384,0,32772,12289,32771,32768,0,32772,12289,32771,32769,
+0,32772,12290,32770,0,32772,12291,0,32772,12291,32770,0,};
+static const uint8_t action_table[256][2][6] = {
+{{99,152,7,136,81,127,},},{{114,30,0,96,0,0,},},{{95,81,1,98,124,0,},},{{0}},{{0}},{{96,255,15,95,2,95,},},{{95,255,15,95,0,95,},},{{102,154,4,99,0,0,},},
+{{112,167,3,101,0,0,},{96,80,1,98,26,0,},},{{129,47,6,128,0,0,},},{{106,214,4,99,2,0,},{99,154,5,99,98,0,},},{{96,91,1,98,26,0,},},
+{{0}},{{0}},{{101,34,7,110,43,0,},{96,78,1,98,26,0,},},{{107,155,4,99,2,0,},{101,229,6,113,58,0,},},{{0}},{{0}},{{136,118,6,135,0,0,},{104,145,5,99,2,0,},},
+{{110,40,3,101,0,0,},{102,142,4,99,0,0,},},{{128,238,15,128,0,95,},},{{0}},{{97,107,1,100,121,0,},},{{0}},{{95,91,1,98,124,0,},},{{104,150,5,99,2,0,},
+{100,223,1,101,127,0,},},{{95,105,1,100,121,0,},},{{108,38,2,101,0,0,},{95,80,1,98,124,0,},},{{102,137,4,99,0,0,},},{{116,138,0,96,0,0,},
+{112,166,3,101,0,0,},},{{0}},{{100,160,2,108,130,0,},{95,92,1,98,124,0,},},{{0}},{{103,90,7,99,107,0,},{96,81,1,98,26,0,},},{{103,81,7,99,107,0,},},
+{{0}},{{105,81,5,99,2,0,},},{{109,234,2,101,0,0,},},{{113,235,3,101,0,0,},{98,155,5,99,185,0,},},{{0}},{{113,223,3,101,0,0,},{97,93,1,100,121,0,},},
+{{116,158,0,96,0,0,},{98,75,7,102,162,0,},},{{109,221,2,101,0,0,},},{{97,86,1,98,124,0,},},{{108,41,2,101,0,0,},{95,103,1,100,121,0,},},
+{{98,144,5,99,185,0,},{97,104,1,100,121,0,},},{{102,155,4,99,0,0,},},{{97,90,1,98,124,0,},},{{98,149,7,136,181,125,},},{{114,10,0,96,0,0,},
+{95,90,1,98,124,0,},},{{99,153,5,99,98,0,},},{{95,104,1,100,121,0,},},{{109,235,2,101,0,0,},},{{0}},{{99,150,5,99,98,0,},},{{116,128,0,96,0,0,},
+{105,90,5,99,2,0,},},{{108,29,2,101,0,0,},},{{0}},{{95,73,1,98,124,0,},},{{100,34,7,110,137,0,},{98,150,5,99,185,0,},},{{111,95,3,101,0,0,},},
+{{107,137,4,99,2,0,},{101,230,1,101,30,0,},},{{0}},{{107,144,4,99,2,0,},},{{0}},{{97,92,1,98,124,0,},},{{108,39,2,101,0,0,},},{{110,43,3,101,0,0,},},
+{{104,155,5,99,2,0,},{97,73,1,98,124,0,},},{{0}},{{96,86,1,98,26,0,},},{{96,95,1,100,22,0,},},{{101,36,7,112,53,0,},},{{99,11,7,107,75,0,},},
+{{100,35,7,111,141,0,},},{{117,236,0,96,0,0,},},{{118,173,1,96,0,0,},{102,153,4,99,0,0,},},{{102,144,4,99,0,0,},{99,155,5,99,98,0,},},
+{{0}},{{0}},{{101,4,1,117,2,0,},},{{0}},{{114,0,0,96,0,0,},{113,233,3,101,0,0,},},{{99,75,7,102,70,0,},},{{0}},{{106,209,4,99,2,0,},},{{113,231,3,101,0,0,},
+{95,93,1,100,121,0,},},{{110,31,3,101,0,0,},{98,8,7,121,155,0,},},{{117,222,0,96,0,0,},},{{96,89,1,98,26,0,},},{{117,237,0,96,0,0,},},
+{{111,102,3,101,0,0,},},{{109,232,2,101,0,0,},},{{110,38,3,101,0,0,},{101,33,7,109,38,0,},},{{99,142,5,99,98,0,},},{{113,232,3,101,0,0,},
+{103,92,7,99,107,0,},},{{112,159,3,101,0,0,},{106,220,4,99,2,0,},},{{0}},{{110,41,3,101,0,0,},{96,106,1,100,22,0,},},{{0}},{{106,208,4,99,2,0,},
+{95,193,6,114,109,0,},},{{112,170,3,101,0,0,},{98,11,7,107,166,0,},},{{109,233,2,101,0,0,},{97,91,1,98,124,0,},},{{114,44,0,96,0,0,},
+{100,229,6,113,149,0,},},{{95,107,1,100,121,0,},},{{115,74,0,96,0,0,},{105,91,5,99,2,0,},},{{103,89,7,99,107,0,},},{{0}},{{107,145,4,99,2,0,},},
+{{126,140,7,136,153,106,},},{{0}},{{118,158,1,96,0,0,},{96,193,6,114,7,0,},},{{100,96,2,108,130,0,},},{{127,23,5,126,4,0,},{118,128,1,96,0,0,},},
+{{114,45,0,96,0,0,},},{{120,6,1,119,2,0,},{98,142,5,99,185,0,},},{{102,145,4,99,0,0,},{101,231,1,101,30,0,},},{{122,205,7,133,160,105,},
+{97,95,1,100,121,0,},},{{110,29,3,101,0,0,},},{{0}},{{0}},{{113,230,3,101,0,0,},},{{103,73,7,99,107,0,},},{{116,172,0,96,0,0,},{96,107,1,100,22,0,},},
+{{134,240,5,129,0,0,},{98,145,5,99,185,0,},},{{96,195,6,116,17,0,},},{{133,115,6,132,0,0,},{130,175,6,128,0,0,},},{{125,20,5,124,2,0,},
+{96,103,1,100,22,0,},},{{0}},{{98,156,5,99,185,0,},{95,106,1,100,121,0,},},{{0}},{{121,7,4,120,0,0,},{97,78,1,98,124,0,},},{{107,153,4,99,2,0,},},
+{{0}},{{104,153,5,99,2,0,},{99,142,7,136,102,104,},},{{100,233,1,101,127,0,},{95,194,6,115,113,0,},},{{100,230,1,101,127,0,},},{{0}},{{0}},{{118,138,1,96,0,0,},
+{105,78,5,99,2,0,},},{{96,194,6,115,12,0,},},{{99,149,7,136,93,125,},{98,154,5,99,185,0,},},{{101,221,1,101,30,0,},},{{102,156,4,99,0,0,},},
+{{107,156,4,99,2,0,},{99,144,5,99,98,0,},},{{99,145,5,99,98,0,},},{{101,233,1,101,30,0,},{101,160,2,108,34,0,},},{{0}},{{111,103,3,101,0,0,},},
+{{115,94,0,96,0,0,},{96,93,1,100,22,0,},},{{95,195,6,116,117,0,},},{{115,108,0,96,0,0,},{112,168,3,101,0,0,},},{{109,223,2,101,0,0,},
+{104,156,5,99,2,0,},},{{116,174,0,96,0,0,},},{{108,31,2,101,0,0,},},{{103,80,7,99,107,0,},{98,142,7,136,188,104,},},{{0}},{{124,211,7,133,160,123,},},
+{{111,93,3,101,0,0,},},{{0}},{{119,197,6,118,107,0,},{100,33,7,109,133,0,},},{{109,230,2,101,0,0,},{100,231,1,101,127,0,},},{{116,173,0,96,0,0,},},
+{{0}},{{95,95,1,100,121,0,},},{{100,4,1,117,0,0,},{95,86,1,98,124,0,},},{{115,109,0,96,0,0,},},{{0}},{{97,195,6,116,117,0,},},{{0}},{{0}},{{101,232,1,101,30,0,},},
+{{110,39,3,101,0,0,},{101,223,1,101,30,0,},},{{101,96,2,108,34,0,},},{{115,110,0,96,0,0,},},{{104,137,5,99,2,0,},},{{96,104,1,100,22,0,},},
+{{110,42,3,101,0,0,},},{{106,206,4,99,2,0,},},{{108,43,2,101,0,0,},},{{112,171,3,101,0,0,},{97,89,1,98,124,0,},},{{114,46,0,96,0,0,},
+{97,80,1,98,124,0,},},{{96,102,1,100,22,0,},},{{98,79,4,103,158,0,},},{{0}},{{99,137,5,99,98,0,},},{{113,221,3,101,0,0,},{111,106,3,101,0,0,},},
+{{101,235,1,101,30,0,},},{{105,89,5,99,2,0,},},{{98,152,7,136,171,127,},},{{100,232,1,101,127,0,},},{{101,35,7,111,48,0,},},{{123,18,5,122,2,0,},},
+{{105,80,5,99,2,0,},},{{97,103,1,100,121,0,},},{{105,86,5,99,2,0,},{99,156,5,99,98,0,},},{{104,154,5,99,2,0,},},{{100,235,1,101,127,0,},},
+{{0}},{{104,144,5,99,2,0,},},{{0}},{{96,105,1,100,22,0,},},{{95,89,1,98,124,0,},},{{132,50,7,131,107,0,},{102,150,4,99,0,0,},},{{96,92,1,98,26,0,},},
+{{113,234,3,101,0,0,},{103,78,7,99,107,0,},},{{107,150,4,99,2,0,},},{{106,219,4,99,2,0,},},{{111,107,3,101,0,0,},{108,40,2,101,0,0,},},
+{{101,234,1,101,30,0,},},{{111,105,3,101,0,0,},},{{105,73,5,99,2,0,},},{{0}},{{0}},{{107,154,4,99,2,0,},},{{98,137,5,99,185,0,},},{{98,216,7,133,176,127,},},
+{{103,86,7,99,107,0,},},{{97,193,6,114,109,0,},},{{97,102,1,100,121,0,},},{{100,234,1,101,127,0,},},{{95,78,1,98,124,0,},},{{106,218,4,99,2,0,},},
+{{118,174,1,96,0,0,},{97,106,1,100,121,0,},},{{0}},{{0}},{{107,142,4,99,2,0,},},{{135,53,7,134,107,0,},{115,64,0,96,0,0,},},{{98,153,5,99,185,0,},},
+{{99,216,7,133,87,127,},},{{118,172,1,96,0,0,},{112,169,3,101,0,0,},},{{117,238,0,96,0,0,},},{{97,255,15,95,1,95,},},{{105,92,5,99,2,0,},
+{96,73,1,98,26,0,},},{{0}},{{111,104,3,101,0,0,},{109,231,2,101,0,0,},},{{131,241,5,130,0,0,},{97,81,1,98,124,0,},},{{106,217,4,99,2,0,},},
+{{0}},{{0}},{{108,42,2,101,0,0,},},{{112,157,3,101,0,0,},{104,142,5,99,2,0,},},{{96,90,1,98,26,0,},},{{103,91,7,99,107,0,},},{{99,79,4,103,67,0,},},
+{{95,102,1,100,121,0,},},{{97,105,1,100,121,0,},},{{0}},{{0}},{{97,194,6,115,113,0,},},{{99,8,7,121,63,0,},},{{100,221,1,101,127,0,},},{{117,202,0,96,0,0,},},
+{{106,201,4,99,2,0,},{100,36,7,112,145,0,},},{{0}},{{117,192,0,96,0,0,},},};
 
 struct action_table_key {
     uint8_t bytes[3];
@@ -2238,9 +2323,9 @@ struct action_table_key {
 static inline struct action_table_key encode_key(uint32_t target_nfa_state, uint32_t dfa_state, uint32_t dfa_symbol) {
     struct action_table_key key = {{0}};
     key.bytes[0] |= (target_nfa_state >> 0) & 255;
-    key.bytes[1] |= (target_nfa_state >> 8) & 3;
-    key.bytes[1] |= (dfa_state << 2) & 255;
-    key.bytes[2] |= (dfa_symbol >> 0) & 63;
+    key.bytes[1] |= (dfa_state >> 0) & 63;
+    key.bytes[1] |= (dfa_symbol << 6) & 255;
+    key.bytes[2] |= (dfa_symbol >> 2) & 15;
     return key;
 }
 struct action_table_entry {
@@ -2251,11 +2336,8 @@ struct action_table_entry {
 static struct action_table_entry decode_entry(const uint8_t *bytes) {
     struct action_table_entry entry = {0};
     entry.nfa_state |= ((uint32_t)bytes[3] & 255) << 0;
-    entry.nfa_state |= ((uint32_t)bytes[4] & 3) << 8;
-    entry.actions |= ((uint32_t)bytes[4] & 255) >> 2;
-    entry.actions |= ((uint32_t)bytes[5] & 3) << 6;
-    entry.push_nfa_state |= ((uint32_t)bytes[5] & 255) >> 2;
-    entry.push_nfa_state |= ((uint32_t)bytes[6] & 15) << 6;
+    entry.actions |= ((uint32_t)bytes[4] & 255) << 0;
+    entry.push_nfa_state |= ((uint32_t)bytes[5] & 255) << 0;
     return entry;
 }
 static struct action_table_entry action_table_lookup(uint32_t nfa_state, uint32_t dfa_state, uint32_t token) {
@@ -2294,7 +2376,7 @@ static size_t build_parse_tree(struct owl_default_tokenizer *tokenizer, struct o
     size_t whitespace = tokenizer->whitespace;
     size_t offset = tokenizer->offset - whitespace;
     construct_begin(&construct_state, offset, CONSTRUCT_NORMAL_ROOT);
-    uint32_t nfa_state = 91;
+    uint32_t nfa_state = 97;
     while (run) {
         uint16_t length_offset = run->lengths_size - 1;
         uint16_t n = run->number_of_tokens;
@@ -2303,7 +2385,7 @@ static size_t build_parse_tree(struct owl_default_tokenizer *tokenizer, struct o
             size_t end = offset;
             size_t len = 0;
             struct action_table_entry entry = action_table_lookup(nfa_state, run->states[i], run->tokens[i]);
-            if (run->tokens[i] < 29)
+            if (run->tokens[i] < 30)
                 len = decode_token_length(run, &length_offset, &offset);
             else {
                 if (stack_depth >= stack_capacity) {
@@ -2319,7 +2401,7 @@ static size_t build_parse_tree(struct owl_default_tokenizer *tokenizer, struct o
                 state_stack[stack_depth++] = entry.push_nfa_state;
             }
             apply_actions(&construct_state, entry.actions, end, end + whitespace);
-            if (run->states[i] == 44) {
+            if (run->states[i] == 47) {
                 if (stack_depth == 0)
                     abort();
                 nfa_state = state_stack[--stack_depth];
@@ -2355,15 +2437,15 @@ static size_t read_keyword_token(uint32_t *token, bool *end_token, const char *t
     switch (text[0]) {
     case 40:
         *end_token = false;
-        *token = 22;
+        *token = 23;
         return 1;
     case 41:
         *end_token = true;
-        *token = 24;
+        *token = 25;
         return 1;
     case 44:
         *end_token = false;
-        *token = 19;
+        *token = 20;
         return 1;
     case 46:
         switch (text[1]) {
@@ -2499,16 +2581,16 @@ static size_t read_keyword_token(uint32_t *token, bool *end_token, const char *t
         return 1;
     case 67:
         *end_token = false;
-        *token = 25;
+        *token = 26;
         return 1;
     case 82:
         *end_token = false;
-        *token = 23;
+        *token = 24;
         return 1;
     case 99:
         if (text[1] == 97 && text[2] == 108 && text[3] == 108) {
             *end_token = false;
-            *token = 20;
+            *token = 21;
             return 4;
         } else {
             return 0;
@@ -2521,10 +2603,18 @@ static size_t read_keyword_token(uint32_t *token, bool *end_token, const char *t
         } else {
             return 0;
         }
+    case 103:
+        if (text[1] == 111 && text[2] == 116 && text[3] == 111) {
+            *end_token = false;
+            *token = 18;
+            return 4;
+        } else {
+            return 0;
+        }
     case 109:
         if (text[1] == 111 && text[2] == 118) {
             *end_token = false;
-            *token = 18;
+            *token = 19;
             return 3;
         } else {
             return 0;
@@ -2532,7 +2622,7 @@ static size_t read_keyword_token(uint32_t *token, bool *end_token, const char *t
     case 114:
         if (text[1] == 101 && text[2] == 116) {
             *end_token = false;
-            *token = 21;
+            *token = 22;
             return 3;
         } else {
             return 0;
@@ -2567,7 +2657,7 @@ static uint32_t rule_lookup(uint32_t parent, uint32_t slot, void *context) {
         break;
     case 1:
         switch (slot) {
-        case 0: return 9;
+        case 0: return 10;
         case 1: return 2;
         case 2: return 3;
         case 3: return 4;
@@ -2577,47 +2667,55 @@ static uint32_t rule_lookup(uint32_t parent, uint32_t slot, void *context) {
         break;
     case 2:
         switch (slot) {
-        case 0: return 10;
-        case 1: return 9;
+        case 0: return 11;
+        case 1: return 10;
         default: break;
         }
         break;
     case 3:
         switch (slot) {
-        case 0: return 10;
+        case 0: return 11;
         default: break;
         }
         break;
     case 4:
         switch (slot) {
-        case 0: return 11;
+        case 0: return 12;
         default: break;
         }
         break;
     case 5:
         switch (slot) {
-        case 0: return 7;
-        case 1: return 6;
+        case 0: return 6;
+        case 1: return 12;
         case 2: return 8;
+        case 3: return 7;
+        case 4: return 9;
         default: break;
         }
         break;
     case 6:
         switch (slot) {
-        case 0: return 7;
-        case 1: return 8;
+        case 0: return 11;
         default: break;
         }
         break;
     case 7:
         switch (slot) {
-        case 0: return 10;
+        case 0: return 8;
+        case 1: return 9;
         default: break;
         }
         break;
     case 8:
         switch (slot) {
-        case 0: return 10;
+        case 0: return 11;
+        default: break;
+        }
+        break;
+    case 9:
+        switch (slot) {
+        case 0: return 11;
         default: break;
         }
         break;
@@ -2637,13 +2735,14 @@ static size_t number_of_slots_lookup(uint32_t rule, void *context) {
     case 2: return 2;
     case 3: return 1;
     case 4: return 1;
-    case 5: return 3;
-    case 6: return 2;
-    case 7: return 1;
+    case 5: return 5;
+    case 6: return 1;
+    case 7: return 2;
     case 8: return 1;
-    case 9: return 0;
+    case 9: return 1;
     case 10: return 0;
     case 11: return 0;
+    case 12: return 0;
     default: return 0;
     }
 }
@@ -2705,6 +2804,11 @@ static void left_right_operand_slots_lookup(uint32_t rule, uint32_t *left, uint3
         *operand = 4294967295U;
         break;
     case 11:
+        *left = 4294967295U;
+        *right = 4294967295U;
+        *operand = 4294967295U;
+        break;
+    case 12:
         *left = 4294967295U;
         *right = 4294967295U;
         *operand = 4294967295U;

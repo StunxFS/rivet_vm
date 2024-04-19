@@ -9,6 +9,11 @@
 
 .func "other_func" {
     .registers 0
+entry:
+    mov R(0), C(0)
+    goto loop
+
+loop:
     ret
 }
 
